@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 
 import '../core/supabase_client.dart';
+import '../models/mensagem_model.dart';
 import '../models/song_model.dart';
 import '../widgets/song_card.dart';
 import 'admin_login_page.dart';
@@ -22,11 +23,13 @@ class _HomePageState extends State<HomePage> {
   Timer? _debounce;
 
   Future<List<SongModel>>? _future;
+  MensagemModel? _mensagem;
 
   @override
   void initState() {
     super.initState();
     _future = _fetchSongs('');
+    _fetchMensagem();
   }
 
   @override
@@ -34,6 +37,28 @@ class _HomePageState extends State<HomePage> {
     _debounce?.cancel();
     _searchController.dispose();
     super.dispose();
+  }
+
+  /// Busca a mensagem ativa mais recente enviada pelo admin.
+  Future<void> _fetchMensagem() async {
+    try {
+      final client = SupabaseClientFactory.instance;
+      final response = await client
+          .from('mensagens')
+          .select('id, conteudo, ativa, criada_em')
+          .eq('ativa', true)
+          .order('criada_em', ascending: false)
+          .limit(1);
+
+      final list = (response as List?) ?? const [];
+      if (!mounted || list.isEmpty) return;
+
+      setState(() {
+        _mensagem = MensagemModel.fromMap(list.first as Map<String, dynamic>);
+      });
+    } catch (_) {
+      // Silencioso: se não houver tabela/permissão, não quebra a HomePage.
+    }
   }
 
   void _onSearchChanged(String value) {
@@ -104,6 +129,36 @@ class _HomePageState extends State<HomePage> {
     ).push(MaterialPageRoute(builder: (_) => SongDetailPage(song: song)));
   }
 
+  /// Banner exibindo a mensagem do admin no topo do catálogo.
+  Widget _buildMensagemBanner(MensagemModel mensagem) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [scheme.primary, scheme.primary.withValues(alpha: 0.8)],
+        ),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.campaign, color: scheme.onPrimary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              mensagem.conteudo,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: scheme.onPrimary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -144,6 +199,10 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ),
               ),
+              if (_mensagem != null) ...[
+                const SizedBox(height: 12),
+                _buildMensagemBanner(_mensagem!),
+              ],
               const SizedBox(height: 16),
               Expanded(
                 child: FutureBuilder<List<SongModel>>(
