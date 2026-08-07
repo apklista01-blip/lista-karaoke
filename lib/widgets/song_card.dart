@@ -24,7 +24,7 @@ class SongCard extends StatelessWidget {
           child: Row(
             children: [
               Container(
-                width: 48,
+                width: 84,
                 height: 48,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 
+import '../core/song_cache.dart';
 import '../core/supabase_client.dart';
 import '../models/mensagem_model.dart';
 import '../models/song_model.dart';
@@ -28,8 +29,38 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    _future = _fetchSongs('');
+    _loadSongsWithCache();
     _fetchMensagem();
+  }
+
+  /// Carrega a lista priorizando o cache local (rápido) e, em paralelo,
+  /// busca os dados mais recentes do Supabase e atualiza o cache.
+  Future<void> _loadSongsWithCache() async {
+    // 1) Mostra o cache local imediatamente (busca instantânea).
+    final cached = await SongCache.load();
+    if (!mounted) return;
+    setState(() {
+      if (cached != null && cached.isNotEmpty) {
+        _future = Future.value(cached);
+      } else {
+        _future = _fetchSongs('');
+      }
+    });
+
+    // 2) Busca no Supabase (dados sempre atualizados) e atualiza o cache.
+    try {
+      final fresh = await _fetchSongs('');
+      if (!mounted) return;
+      await SongCache.save(fresh);
+      // Só atualiza a tela se não houver busca ativa no momento.
+      if (_searchController.text.trim().isEmpty) {
+        setState(() {
+          _future = Future.value(fresh);
+        });
+      }
+    } catch (_) {
+      // Se falhar, mantém o cache exibido (modo offline).
+    }
   }
 
   @override
@@ -122,6 +153,14 @@ class _HomePageState extends State<HomePage> {
     }).toList();
   }
 
+  /// Recarrega a lista de músicas do Supabase e atualiza o cache.
+  Future<void> _reload() async {
+    setState(() {
+      _future = null;
+    });
+    await _loadSongsWithCache();
+  }
+
   /// Abre a tela de detalhes de uma música.
   void _openDetail(BuildContext context, SongModel song) {
     Navigator.of(
@@ -129,12 +168,17 @@ class _HomePageState extends State<HomePage> {
     ).push(MaterialPageRoute(builder: (_) => SongDetailPage(song: song)));
   }
 
+  /// Fecha (oculta) a mensagem do admin na sessão atual.
+  void _dismissMensagem() {
+    setState(() => _mensagem = null);
+  }
+
   /// Banner exibindo a mensagem do admin no topo do catálogo.
   Widget _buildMensagemBanner(MensagemModel mensagem) {
     final scheme = Theme.of(context).colorScheme;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.only(left: 14, right: 6, top: 8, bottom: 8),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [scheme.primary, scheme.primary.withValues(alpha: 0.8)],
@@ -154,6 +198,11 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
           ),
+          IconButton(
+            tooltip: 'Fechar mensagem',
+            icon: Icon(Icons.close, color: scheme.onPrimary),
+            onPressed: _dismissMensagem,
+          ),
         ],
       ),
     );
@@ -172,6 +221,11 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
         actions: [
+          IconButton(
+            tooltip: 'Recarregar',
+            icon: const Icon(Icons.refresh),
+            onPressed: _reload,
+          ),
           IconButton(
             tooltip: 'Área do Admin',
             icon: const Icon(Icons.admin_panel_settings),
