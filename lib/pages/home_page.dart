@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 
+import '../core/access_log.dart';
 import '../core/favorites_store.dart';
 import '../core/song_cache.dart';
 import '../core/supabase_client.dart';
@@ -35,6 +36,8 @@ class _HomePageState extends State<HomePage> {
     _loadSongsWithCache();
     _fetchMensagem();
     _loadFavorites();
+    // Registra a abertura do app para as estatísticas de uso (APK + Web).
+    AccessLog.registrarAcesso();
   }
 
   /// Carrega os números das músicas favoritas salvas no dispositivo.

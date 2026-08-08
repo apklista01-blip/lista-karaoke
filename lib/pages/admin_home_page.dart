@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../core/access_stats_service.dart';
 import '../core/supabase_client.dart';
+import '../models/acesso_stats.dart';
 import '../models/song_model.dart';
 import '../widgets/loading_button.dart';
 
@@ -35,6 +37,23 @@ class _AdminHomePageState extends State<AdminHomePage> {
   final _msgCtrl = TextEditingController();
   bool _sendingMsg = false;
   String? _msgResult;
+
+  // ---- Estatísticas ----
+  AcessoStats? _stats;
+  bool _statsLoading = false;
+
+  Future<void> _loadStats() async {
+    setState(() {
+      _statsLoading = true;
+      _stats = null;
+    });
+    final stats = await AccessStatsService.fetch();
+    if (!mounted) return;
+    setState(() {
+      _stats = stats;
+      _statsLoading = false;
+    });
+  }
 
   @override
   void dispose() {
@@ -356,6 +375,11 @@ class _AdminHomePageState extends State<AdminHomePage> {
                     icon: Icon(Icons.campaign),
                     label: Text('Mensagem'),
                   ),
+                  ButtonSegment(
+                    value: 3,
+                    icon: Icon(Icons.bar_chart),
+                    label: Text('Estatísticas'),
+                  ),
                 ],
                 selected: {_currentIndex},
                 onSelectionChanged: (selection) =>
@@ -369,6 +393,7 @@ class _AdminHomePageState extends State<AdminHomePage> {
                   _buildAddPanel(),
                   _buildSearchPanel(),
                   _buildMessagePanel(),
+                  _buildStatsPanel(),
                 ],
               ),
             ),
@@ -595,5 +620,148 @@ class _AdminHomePageState extends State<AdminHomePage> {
         ],
       ),
     );
+  }
+
+  // ---- Painel 4: Estatísticas de uso ----
+  Widget _buildStatsPanel() {
+    final scheme = Theme.of(context).colorScheme;
+
+    // Carrega as estatísticas na primeira vez que o painel é exibido.
+    if (_stats == null && !_statsLoading) {
+      _loadStats();
+    }
+
+    if (_statsLoading) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 12),
+            Text('Carregando estatísticas...'),
+          ],
+        ),
+      );
+    }
+
+    final stats = _stats;
+    if (stats == null) {
+      return const Center(
+        child: Text('Não foi possível carregar as estatísticas.'),
+      );
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Estatísticas de uso do app',
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Acessos únicos por dispositivo (APK e Web).',
+            style: TextStyle(color: scheme.onSurfaceVariant),
+          ),
+          const SizedBox(height: 16),
+          _buildStatCard(
+            icon: Icons.today,
+            label: 'Hoje',
+            value: stats.hoje,
+            color: scheme.primary,
+          ),
+          const SizedBox(height: 12),
+          _buildStatCard(
+            icon: Icons.date_range,
+            label: 'Últimos 7 dias',
+            value: stats.semana,
+            color: scheme.tertiary,
+          ),
+          const SizedBox(height: 12),
+          _buildStatCard(
+            icon: Icons.calendar_month,
+            label: 'Últimos 30 dias',
+            value: stats.mes,
+            color: scheme.secondary,
+          ),
+          const SizedBox(height: 12),
+          _buildStatCard(
+            icon: Icons.people,
+            label: 'Total de acessos',
+            value: stats.total,
+            color: scheme.error,
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'Acessos por dia (últimos 7 dias)',
+            style: Theme.of(
+              context,
+            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 8),
+          if (stats.porDia.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Text(
+                'Ainda não há acessos registrados.',
+                style: TextStyle(color: scheme.onSurfaceVariant),
+              ),
+            )
+          else
+            ...stats.porDia.map(
+              (item) => ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.calendar_today),
+                title: Text(_formatData(item['data'])),
+                trailing: Text(
+                  '${item['total']}',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Card com um contador de estatística.
+  Widget _buildStatCard({
+    required IconData icon,
+    required String label,
+    required int value,
+    required Color color,
+  }) {
+    return Card(
+      margin: EdgeInsets.zero,
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: color.withValues(alpha: 0.15),
+          child: Icon(icon, color: color),
+        ),
+        title: Text(label),
+        trailing: Text(
+          '$value',
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+            color: color,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Formata a data "YYYY-MM-DD" para "DD/MM/YYYY".
+  String _formatData(dynamic data) {
+    final s = data?.toString() ?? '';
+    final parts = s.split('-');
+    if (parts.length == 3) {
+      return '${parts[2]}/${parts[1]}/${parts[0]}';
+    }
+    return s;
   }
 }
