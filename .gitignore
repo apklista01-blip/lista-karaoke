@@ -43,3 +43,7 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Arquivos auxiliares locais (não versionar)
+backup_vscode_config.zip
+extensoes_vscode.txt

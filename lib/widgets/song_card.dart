@@ -6,12 +6,24 @@ import '../models/song_model.dart';
 class SongCard extends StatelessWidget {
   final SongModel song;
   final VoidCallback? onTap;
+  final bool? isFavorite;
+  final VoidCallback? onFavoriteToggle;
 
-  const SongCard({super.key, required this.song, this.onTap});
+  const SongCard({
+    super.key,
+    required this.song,
+    this.onTap,
+    this.isFavorite,
+    this.onFavoriteToggle,
+  });
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+
+    // Determina se o ícone de favorito deve ser exibido.
+    final showFavorite = isFavorite != null && onFavoriteToggle != null;
+
     return Card(
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
@@ -63,6 +75,22 @@ class SongCard extends StatelessWidget {
                   ],
                 ),
               ),
+              if (showFavorite) ...[
+                const SizedBox(width: 8),
+                IconButton(
+                  tooltip: isFavorite!
+                      ? 'Remover dos favoritos'
+                      : 'Adicionar aos favoritos',
+                  icon: Icon(
+                    isFavorite! ? Icons.favorite : Icons.favorite_border,
+                    color: isFavorite!
+                        ? Colors.redAccent
+                        : scheme.onSurfaceVariant.withValues(alpha: 0.6),
+                  ),
+                  onPressed: onFavoriteToggle,
+                ),
+                const SizedBox(width: 4),
+              ],
               if (onTap != null) ...[
                 const SizedBox(width: 8),
                 Icon(
@@ -77,3 +105,4 @@ class SongCard extends StatelessWidget {
     );
   }
 }
+

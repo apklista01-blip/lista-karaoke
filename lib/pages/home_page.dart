@@ -3,12 +3,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 
+import '../core/favorites_store.dart';
 import '../core/song_cache.dart';
 import '../core/supabase_client.dart';
 import '../models/mensagem_model.dart';
 import '../models/song_model.dart';
 import '../widgets/song_card.dart';
 import 'admin_login_page.dart';
+import 'favorites_page.dart';
 import 'song_detail_page.dart';
 
 /// Página inicial: catálogo de músicas com busca.
@@ -25,12 +27,37 @@ class _HomePageState extends State<HomePage> {
 
   Future<List<SongModel>>? _future;
   MensagemModel? _mensagem;
+  Set<int> _favorites = <int>{};
 
   @override
   void initState() {
     super.initState();
     _loadSongsWithCache();
     _fetchMensagem();
+    _loadFavorites();
+  }
+
+  /// Carrega os números das músicas favoritas salvas no dispositivo.
+  Future<void> _loadFavorites() async {
+    final favs = await FavoritesStore.load();
+    if (!mounted) return;
+    setState(() => _favorites = favs);
+  }
+
+  /// Alterna o estado de favorito de uma música e atualiza a tela.
+  Future<void> _toggleFavorite(int numero) async {
+    await FavoritesStore.toggle(numero);
+    if (!mounted) return;
+    setState(() {
+      _favorites = FavoritesStore.current;
+    });
+  }
+
+  /// Abre a página de músicas favoritas.
+  void _openFavorites() {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const FavoritesPage()));
   }
 
   /// Carrega a lista priorizando o cache local (rápido) e, em paralelo,
@@ -222,6 +249,15 @@ class _HomePageState extends State<HomePage> {
         ),
         actions: [
           IconButton(
+            tooltip: 'Favoritos',
+            icon: Badge(
+              isLabelVisible: _favorites.isNotEmpty,
+              label: Text('${_favorites.length}'),
+              child: const Icon(Icons.favorite),
+            ),
+            onPressed: _openFavorites,
+          ),
+          IconButton(
             tooltip: 'Recarregar',
             icon: const Icon(Icons.refresh),
             onPressed: _reload,
@@ -300,6 +336,8 @@ class _HomePageState extends State<HomePage> {
                         final song = songs[index];
                         return SongCard(
                           song: song,
+                          isFavorite: _favorites.contains(song.numero),
+                          onFavoriteToggle: () => _toggleFavorite(song.numero),
                           onTap: () => _openDetail(context, song),
                         );
                       },

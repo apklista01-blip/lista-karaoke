@@ -1,24 +1,60 @@
 import 'package:flutter/material.dart';
 
+import '../core/favorites_store.dart';
 import '../models/song_model.dart';
 
 /// Tela de detalhes de uma música: mostra número, cantor, música,
 /// trecho em destaque e a letra completa (com rolagem).
-class SongDetailPage extends StatelessWidget {
+class SongDetailPage extends StatefulWidget {
   final SongModel song;
 
   const SongDetailPage({super.key, required this.song});
 
   @override
+  State<SongDetailPage> createState() => _SongDetailPageState();
+}
+
+class _SongDetailPageState extends State<SongDetailPage> {
+  bool _isFavorite = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _isFavorite = FavoritesStore.isFavorite(widget.song.numero);
+  }
+
+  /// Alterna o estado de favorito da música atual.
+  Future<void> _toggleFavorite() async {
+    final nowFavorite = await FavoritesStore.toggle(widget.song.numero);
+    if (!mounted) return;
+    setState(() => _isFavorite = nowFavorite);
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    final song = widget.song;
     final hasTrecho = song.trecho.trim().isNotEmpty;
     final hasLetra =
         song.letraCompleta != null && song.letraCompleta!.trim().isNotEmpty;
 
     return Scaffold(
-      appBar: AppBar(title: Text('Música ${song.numero}')),
+      appBar: AppBar(
+        title: Text('Música ${song.numero}'),
+        actions: [
+          IconButton(
+            tooltip: _isFavorite
+                ? 'Remover dos favoritos'
+                : 'Adicionar aos favoritos',
+            icon: Icon(
+              _isFavorite ? Icons.favorite : Icons.favorite_border,
+              color: _isFavorite ? Colors.redAccent : null,
+            ),
+            onPressed: _toggleFavorite,
+          ),
+        ],
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
@@ -146,3 +182,4 @@ class SongDetailPage extends StatelessWidget {
     );
   }
 }
+
